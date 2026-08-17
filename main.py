@@ -1,8 +1,9 @@
-import os
+import discord
 from discord.ext import commands
 import yt_dlp
 import asyncio
 from datetime import timedelta
+import os
 
 # إعدادات البوت
 intents = discord.Intents.default()
