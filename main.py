@@ -13,13 +13,14 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 # إعدادات yt-dlp
 ydl_options = {
     'format': 'bestaudio/best',
-    'postprocessors': [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192',
-    }],
     'quiet': True,
     'no_warnings': True,
+    'noplaylist': True,
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'web']
+        }
+    },
 }
 
 # Dictionary لتخزين قائمة التشغيل لكل سيرفر
