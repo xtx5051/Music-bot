@@ -44,15 +44,13 @@ YTDL_OPTIONS = {
     'no_warnings': True,
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
-    # هذا الجزء هو "السحر" الذي يحل مشكلة الحظر:
     'extractor_args': {
         'youtube': {
-            'player_client': ['android', 'ios'],
+            'player_client': ['mweb', 'tvhtml5'],
         }
     }
 }
 
-# تهيئة ytdl
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
 
 
