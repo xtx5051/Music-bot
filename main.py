@@ -123,7 +123,7 @@ async def play(ctx, *, search):
             player.add_to_queue(url, title)
             
             duration_str = str(timedelta(seconds=duration))
-            await ctx.send(f"✅ تمت الإضافة إلى قائمة التشغيل:\n**{title}**\n⏱️ المدة: {duration_str}\n📋 عدد الأغاني المتبقية: {len(player.queue)}")
+            await ctx.send(f"✅ تمت الإضافة إلى قائمة التشغيل:\n**{title}**\n⏱️ المدة: {duration_str}\n📋 عدد الأغاني المتبقية: {len(player.queue) - 1}")
             
             # إذا لم يكن هناك أغنية تشغيل حالياً، ابدأ التشغيل
             if not ctx.voice_client.is_playing():
