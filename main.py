@@ -187,7 +187,7 @@ async def skip(ctx):
     else:
         await ctx.send("❌ لا توجد أغنية قيد التشغيل!")
 
-@bot.command(name='help')
+@bot.command(name='myhelp')
 async def help_command(ctx):
     """الأمر: !help - عرض قائمة الأوامر"""
     embed = discord.Embed(title="🎵 أوامر بوت الموسيقى", color=discord.Color.gold())
