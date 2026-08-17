@@ -22,6 +22,7 @@ class MusicPlayer:
         self.current_song = None
         self.voice_client = None
         self.manual_leave = False
+        self.last_text_channel = None
 
     def add_to_queue(self, song):
         self.queue.append(song)
