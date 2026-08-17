@@ -93,8 +93,9 @@ async def on_ready():
         print(f"تم الدخول للروم: {channel.name}")
 
     except Exception as e:
-        print(f"خطأ في دخول الروم: {e}")
-
+    print(f"VOICE ERROR: {type(e).__name__}: {e}")
+    await ctx.send(f"خطأ الاتصال بالروم: {type(e).__name__}: {e}")
+    return
 
 # =========================
 # إعادة الاتصال بالروم
