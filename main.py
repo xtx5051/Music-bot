@@ -27,6 +27,9 @@ intents.voice_states = True
 bot = commands.Bot(command_prefix="", intents=intents)
 
 # خيارات محسنة لـ yt-dlp لتجاوز حظر يوتيوب في السيرفرات
+import yt_dlp
+
+# الإعدادات المحدثة والمطورة لتجاوز حظر يوتيوب
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -39,17 +42,19 @@ YTDL_OPTIONS = {
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'auto',
+    'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
-    'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
+    # هذا الجزء هو "السحر" الذي يحل مشكلة الحظر:
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios'],
+        }
+    }
 }
 
-FFMPEG_OPTIONS = {
-    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
-}
-
+# تهيئة ytdl
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
+
 
 song_queues = {}
 
