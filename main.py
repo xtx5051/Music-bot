@@ -76,7 +76,7 @@ async def join(ctx):
     
     voice_client = await channel.connect()
     
-    # تهيئة ��ائمة التشغيل
+    # تهيئة قائمة التشغيل
     if ctx.guild.id not in playlists:
         playlists[ctx.guild.id] = MusicPlayer(ctx.guild.id)
     
@@ -211,6 +211,22 @@ async def skip(ctx):
     else:
         await ctx.send("❌ لا توجد أغنية قيد التشغيل!")
 
+# أوامر الأحرف المختصرة
+@bot.command(name='ش')
+async def play_shortcut(ctx, *, search):
+    """اختصار: ش [اسم الأغنية] - تشغيل أغنية"""
+    await play(ctx, search=search)
+
+@bot.command(name='و')
+async def stop_shortcut(ctx):
+    """اختصار: و - إيقاف التشغيل"""
+    await stop(ctx)
+
+@bot.command(name='س')
+async def skip_shortcut(ctx):
+    """اختصار: س - تخطي الأغنية"""
+    await skip(ctx)
+
 @bot.command(name='myhelp')
 async def help_command(ctx):
     """الأمر: !help - عرض قائمة الأوامر"""
@@ -220,10 +236,13 @@ async def help_command(ctx):
         ("!join", "دخول الغرفة الصوتية"),
         ("!leave", "مغادرة الغرفة الصوتية"),
         ("!play [اسم/رابط]", "تشغيل أغنية"),
+        ("!ش [اسم/رابط]", "⭐ تشغيل أغنية (اختصار)"),
         ("!pause", "إيقاف مؤقت"),
         ("!resume", "استئناف التشغيل"),
         ("!stop", "إيقاف التشغيل"),
+        ("!و", "⭐ إيقاف التشغيل (اختصار)"),
         ("!skip", "تخطي الأغنية"),
+        ("!س", "⭐ تخطي الأغنية (اختصار)"),
         ("!queue", "عرض قائمة التشغيل"),
         ("!help", "عرض هذه الرسالة"),
     ]
