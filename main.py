@@ -45,13 +45,13 @@ class MusicPlayer:
 @bot.event
 async def on_ready():
     print(f'✅ البوت شغال! {bot.user}')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="🎵 الموسيقى"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=""))
 
 @bot.command(name='join')
 async def join(ctx):
-    """الأمر: !join - دخول الغرفة الصوتية"""
+    """الأمر: د - دخول الغرفة الصوتية"""
     if not ctx.author.voice:
-        await ctx.send("❌ أنت لازم تكون في غرفة صوتية أولاً!")
+        await ctx.send(" خش الروم اول يا ثور")
         return
     
     channel = ctx.author.voice.channel
@@ -62,25 +62,25 @@ async def join(ctx):
         playlists[ctx.guild.id] = MusicPlayer(ctx.guild.id)
     
     playlists[ctx.guild.id].voice_client = voice_client
-    await ctx.send(f"✅ تم الدخول إلى الغرفة: **{channel.name}**")
+    await ctx.send(f"خشيت: **{channel.name}**")
 
 @bot.command(name='leave')
 async def leave(ctx):
     """الأمر: !leave - مغادرة الغرفة الصوتية"""
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        await ctx.send("👋 تم المغادرة!")
+        await ctx.send("طلعت")
     else:
         await ctx.send("❌ البوت غير متصل بأي غرفة صوتية!")
 
 @bot.command(name='play')
 async def play(ctx, *, search):
-    """الأمر: !play [اسم الأغنية أو الرابط]"""
+    """الأمر: ش [وش اسم الاغنيه ؟]"""
     if not ctx.voice_client:
         await ctx.send("❌ البوت غير متصل! استخدم !join أولاً")
         return
     
-    await ctx.send(f"🔍 جاري البحث عن: **{search}**...")
+    await ctx.send(f"ثواني ابحث: **{search}**...")
     
     try:
         with yt_dlp.YoutubeDL(ydl_options) as ydl:
@@ -131,7 +131,7 @@ async def play_next(ctx):
 
 @bot.command(name='pause')
 async def pause(ctx):
-    """الأمر: !pause - إيقاف مؤقت"""
+    """الأمر: !pause -و"""
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.pause()
         await ctx.send("⏸️ تم الإيقاف المؤقت")
@@ -140,7 +140,7 @@ async def pause(ctx):
 
 @bot.command(name='resume')
 async def resume(ctx):
-    """الأمر: !resume - استئناف التشغيل"""
+    """الأمر: !resume -ا"""
     if ctx.voice_client and ctx.voice_client.is_paused():
         ctx.voice_client.resume()
         await ctx.send("▶️ تم استئناف التشغيل")
@@ -149,7 +149,7 @@ async def resume(ctx):
 
 @bot.command(name='stop')
 async def stop(ctx):
-    """الأمر: !stop - إيقاف التشغيل"""
+    """الأمر: !stop -و"""
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
         playlists[ctx.guild.id].queue = []
@@ -170,7 +170,7 @@ async def queue(ctx):
     embed = discord.Embed(title="📋 قائمة التشغيل", color=discord.Color.purple())
     
     if player.current_song:
-        embed.add_field(name="▶️ الآن يتم التشغيل", value=player.current_song['title'], inline=False)
+        embed.add_field(name="بشغل", value=player.current_song['title'], inline=False)
     
     for i, song in enumerate(player.queue[:10], 1):
         embed.add_field(name=f"{i}. الأغنية التالية", value=song['title'], inline=False)
@@ -182,10 +182,10 @@ async def queue(ctx):
 
 @bot.command(name='skip')
 async def skip(ctx):
-    """الأمر: !skip - تخطي الأغنية الحالية"""
+    """الأمر: !skip -س"""
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
-        await ctx.send("⏭️ تم التخطي للأغنية التالية")
+        await ctx.send("سكبت")
     else:
         await ctx.send("❌ لا توجد أغنية قيد التشغيل!")
 
