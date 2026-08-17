@@ -1,4 +1,4 @@
-import discord
+import os
 from discord.ext import commands
 import yt_dlp
 import asyncio
@@ -211,4 +211,4 @@ async def help_command(ctx):
     await ctx.send(embed=embed)
 
 # تشغيل البوت
-bot.run("MTUyODk1MTkyMDk3MzE4OTE3Mw.GMv9Zj.K9POj9wMZAQVnh49hXcJ2YSH1TlABq6bY4Dz0s")
+bot.run(os.getenv("MTUyODk1MTkyMDk3MzE4OTE3Mw.GfiJg6.YCaiIIoQdMNWbLLO7oxcMOdGoj-_W-8wZF6jd0"))
