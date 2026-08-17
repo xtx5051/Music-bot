@@ -33,6 +33,7 @@ class MusicPlayer:
         self.queue = []
         self.current_song = None
         self.voice_client = None
+        self.is_idle = False  # للتمييز بين الموسيقى الحقيقية والموسيقى الخافتة
 
 
 # =========================
@@ -63,11 +64,11 @@ async def on_ready():
     channel = bot.get_channel(VOICE_CHANNEL_ID)
 
     if channel is None:
-        print("لم يتم العثور على الروم الصوتي")
+        print("❌ لم يتم العثور على الروم الصوتي")
         return
 
     if not isinstance(channel, discord.VoiceChannel):
-        print("الـ ID المضاف ليس رومًا صوتيًا")
+        print("❌ الـ ID المضاف ليس رومًا صوتيًا")
         return
 
     player = playlists.get(channel.guild.id)
@@ -90,7 +91,10 @@ async def on_ready():
 
         player.voice_client = voice_client
 
-        print(f"تم الدخول للروم: {channel.name}")
+        print(f"✅ تم الدخول للروم: {channel.name}")
+        
+        # شغل موسيقى خافتة للبقاء في الروم
+        await play_idle_music(channel.guild.id, voice_client)
 
     except discord.Forbidden:
         print(f"❌ البوت ما عنده صلاحية الدخول للروم الصوتي")
@@ -98,6 +102,55 @@ async def on_ready():
         print(f"❌ خطأ الاتصال: {e}")
     except Exception as e:
         print(f"❌ خطأ غير متوقع: {type(e).__name__}: {e}")
+
+
+# =========================
+# تشغيل موسيقى خافتة (للبقاء في الروم)
+# =========================
+
+async def play_idle_music(guild_id, voice_client):
+    """تشغيل فيديو طويل مع صوت منخفض جداً"""
+    
+    if not voice_client or not voice_client.is_connected():
+        return
+
+    player = playlists.get(guild_id)
+    if not player:
+        return
+
+    try:
+        # فيديو طويل جداً (ساعات) لا يتطلب نقرة تشغيل
+        idle_url = "https://www.youtube.com/watch?v=5qap5aO4i9A"  # 10 ساعات موسيقى هادئة
+        
+        with yt_dlp.YoutubeDL(ydl_options) as ydl:
+            info = ydl.extract_info(idle_url, download=False)
+            url = info.get("url")
+        
+        audio_source = discord.FFmpegPCMAudio(
+            url,
+            before_options=(
+                "-reconnect 1 "
+                "-reconnect_streamed 1 "
+                "-reconnect_delay_max 5"
+            ),
+            options="-vn -filter:a 'volume=0.01'"  # صوت منخفض جداً (1%)
+        )
+        
+        def after_idle_playing(error):
+            if error:
+                print(f"⚠️ خطأ في الموسيقى الخافتة: {error}")
+            # أعد تشغيل الموسيقى الخافتة تلقائياً
+            asyncio.run_coroutine_threadsafe(
+                play_idle_music(guild_id, voice_client),
+                bot.loop
+            )
+        
+        voice_client.play(audio_source, after=after_idle_playing)
+        player.is_idle = True
+        print(f"🔇 تم تشغيل موسيقى خافتة للحفاظ على الاتصال")
+
+    except Exception as e:
+        print(f"⚠️ خطأ في تشغيل الموسيقى الخافتة: {e}")
 
 
 # =========================
@@ -124,6 +177,10 @@ async def keep_connected():
                         if player:
                             player.voice_client = voice_client
                         print(f"✅ تم إعادة الاتصال بـ {channel.name}")
+                        
+                        # شغل موسيقى خافتة
+                        await play_idle_music(channel.guild.id, voice_client)
+                        
                     except discord.Forbidden:
                         print("❌ البوت ما عنده صلاحية")
                     except discord.ClientException:
@@ -139,6 +196,9 @@ async def keep_connected():
                     player = playlists.get(channel.guild.id)
                     if player:
                         player.voice_client = voice_client
+                        # إذا ما كانت في موسيقى، شغل الخافتة
+                        if not voice_client.is_playing():
+                            await play_idle_music(channel.guild.id, voice_client)
 
         except Exception as e:
             print(f"⚠️ خطأ في keep_connected: {e}")
@@ -191,6 +251,10 @@ async def play_next(guild_id, channel):
 
     if not player.queue:
         player.current_song = None
+        # إذا خلصت القائمة، شغل موسيقى خافتة
+        voice_client = player.voice_client
+        if voice_client and voice_client.is_connected():
+            await play_idle_music(guild_id, voice_client)
         return
 
     voice_client = player.voice_client
@@ -200,6 +264,7 @@ async def play_next(guild_id, channel):
 
     song = player.queue.pop(0)
     player.current_song = song
+    player.is_idle = False  # الآن نشغل موسيقى حقيقية
 
     try:
 
@@ -275,7 +340,7 @@ async def play_command(ctx, *, search=None):
             print(f"✅ تم الاتصال بـ {channel.name}")
 
         except discord.Forbidden:
-            await ctx.send("❌ البوت ما عنده صلاحي�� الدخول للروم الصوتي\nتأكد من الصلاحيات في إعدادات السيرفر")
+            await ctx.send("❌ البوت ما عنده صلاحية الدخول للروم الصوتي\nتأكد من الصلاحيات في إعدادات السيرفر")
             print("❌ Forbidden: البوت ما عنده صلاحية")
             return
 
@@ -313,7 +378,9 @@ async def play_command(ctx, *, search=None):
             f"⏳ في الانتظار: {len(player.queue)}"
         )
 
-        if not voice_client.is_playing() and not voice_client.is_paused():
+        # إذا كان يشغل موسيقى خافتة، أوقفه وشغل الأغنية الحقيقية
+        if not voice_client.is_playing() or player.is_idle:
+            voice_client.stop()
             await play_next(
                 ctx.guild.id,
                 ctx.channel
@@ -366,6 +433,9 @@ async def stop_command(ctx):
         player.queue.clear()
         player.current_song = None
         await ctx.send("✅ تم إيقاف التشغيل وحذف قائمة الانتظار")
+        
+        # شغل موسيقى خافتة للبقاء في الروم
+        await play_idle_music(ctx.guild.id, voice_client)
     else:
         await ctx.send("⚠️ ما فيه أغنية شغالة")
 
@@ -462,7 +532,7 @@ async def help_command(ctx):
 **ع**
 → عرض قائمة الانتظار
 
-**ℹ️** البوت يدخل الروم المحدد تلقائيًا ولا يخرج منه.
+**ℹ️** البوت يدخل الروم المحدد تلقائيًا ولا يخرج منه (يشغل موسيقى هادئة للبقاء).
 """
 
     await ctx.send(message)
