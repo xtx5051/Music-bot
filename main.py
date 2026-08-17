@@ -5,9 +5,9 @@ import asyncio
 import os
 from datetime import timedelta
 
-# =========================
-# الإعدادات
-# =========================
+# ==========================================
+# إعدادات البوت
+# ==========================================
 
 VOICE_CHANNEL_ID = 770786224612704306
 
@@ -20,92 +20,116 @@ bot = commands.Bot(
     help_command=None
 )
 
-playlists = {}
-reconnect_task = None
+players = {}
+connection_task = None
 
 
-# =========================
-# إعداد yt-dlp
-# =========================
+# ==========================================
+# إعدادات SoundCloud
+# ==========================================
 
 YDL_OPTIONS = {
     "format": "bestaudio/best",
     "quiet": True,
     "no_warnings": True,
     "noplaylist": True,
-    "default_search": "ytsearch",
+    "extract_flat": False,
 }
 
-
 FFMPEG_OPTIONS = {
-    "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
+    "before_options": (
+        "-reconnect 1 "
+        "-reconnect_streamed 1 "
+        "-reconnect_delay_max 5"
+    ),
     "options": "-vn"
 }
 
 
-# =========================
-# مشغل الموسيقى
-# =========================
+# ==========================================
+# Music Player
+# ==========================================
 
 class MusicPlayer:
+
     def __init__(self):
         self.queue = []
         self.current_song = None
 
 
 def get_player(guild_id):
-    if guild_id not in playlists:
-        playlists[guild_id] = MusicPlayer()
 
-    return playlists[guild_id]
+    if guild_id not in players:
+        players[guild_id] = MusicPlayer()
+
+    return players[guild_id]
 
 
-# =========================
-# الاتصال بالروم المحدد
-# =========================
+# ==========================================
+# الاتصال بالروم الثابت
+# ==========================================
 
-async def connect_to_fixed_channel():
-
-    global reconnect_task
+async def keep_connected():
 
     await bot.wait_until_ready()
-
-    channel = bot.get_channel(VOICE_CHANNEL_ID)
-
-    if channel is None:
-        print("لم يتم العثور على الروم الصوتي")
-        return
-
-    guild = channel.guild
 
     while not bot.is_closed():
 
         try:
 
+            channel = bot.get_channel(VOICE_CHANNEL_ID)
+
+            if channel is None:
+
+                print(
+                    f"لم يتم العثور على الروم: "
+                    f"{VOICE_CHANNEL_ID}"
+                )
+
+                await asyncio.sleep(15)
+                continue
+
+            guild = channel.guild
             voice_client = guild.voice_client
 
-            # إذا كان متصل بالروم المطلوب
-            if voice_client and voice_client.is_connected():
-
-                if voice_client.channel.id == VOICE_CHANNEL_ID:
-                    await asyncio.sleep(10)
-                    continue
-
-                # إذا كان في روم ثاني، يرجع للروم المحدد
-                print("البوت موجود في روم آخر، سيتم نقله للروم المحدد")
-
-                try:
-                    await voice_client.move_to(channel)
-                except Exception as e:
-                    print(f"تعذر نقل البوت: {e}")
+            # البوت متصل بالروم الصحيح
+            if (
+                voice_client
+                and voice_client.is_connected()
+                and voice_client.channel.id == VOICE_CHANNEL_ID
+            ):
 
                 await asyncio.sleep(10)
                 continue
 
-            # لا يوجد اتصال
+            # البوت متصل بروم آخر
+            if (
+                voice_client
+                and voice_client.is_connected()
+                and voice_client.channel.id != VOICE_CHANNEL_ID
+            ):
+
+                print("البوت في روم آخر، سيتم نقله للروم المحدد")
+
+                try:
+                    await voice_client.move_to(channel)
+
+                    print("تم نقل البوت للروم المحدد")
+
+                except Exception as e:
+
+                    print(
+                        f"تعذر نقل البوت: {e}"
+                    )
+
+                await asyncio.sleep(10)
+                continue
+
+            # البوت غير متصل
             print("البوت غير متصل، محاولة الاتصال...")
 
             try:
+
                 await channel.connect(
                     reconnect=True,
                     timeout=30
@@ -114,30 +138,36 @@ async def connect_to_fixed_channel():
                 print("تم الاتصال بالروم المحدد")
 
             except Exception as e:
-                print(f"تعذر الاتصال بالروم الصوتي: {e}")
+
+                print(
+                    f"تعذر الاتصال بالروم الصوتي: {e}"
+                )
 
             await asyncio.sleep(10)
 
         except Exception as e:
 
-            print(f"خطأ في نظام الاتصال: {e}")
+            print(
+                f"خطأ في نظام الاتصال: {e}"
+            )
 
             await asyncio.sleep(10)
 
 
-# =========================
+# ==========================================
 # عند تشغيل البوت
-# =========================
+# ==========================================
 
 @bot.event
 async def on_ready():
 
-    global reconnect_task
+    global connection_task
 
-    print("--------------------------------")
+    print("================================")
     print(f"البوت شغال: {bot.user}")
     print(f"الروم الثابت: {VOICE_CHANNEL_ID}")
-    print("--------------------------------")
+    print("المصدر: SoundCloud")
+    print("================================")
 
     await bot.change_presence(
         activity=discord.Activity(
@@ -146,40 +176,62 @@ async def on_ready():
         )
     )
 
-    if reconnect_task is None or reconnect_task.done():
-        reconnect_task = asyncio.create_task(
-            connect_to_fixed_channel()
+    if (
+        connection_task is None
+        or connection_task.done()
+    ):
+
+        connection_task = asyncio.create_task(
+            keep_connected()
         )
 
 
-# =========================
-# البحث عن أغنية
-# =========================
+# ==========================================
+# البحث في SoundCloud فقط
+# ==========================================
 
-def search_song(query):
+def search_soundcloud(query):
 
-    with yt_dlp.YoutubeDL(YDL_OPTIONS) as ydl:
+    options = YDL_OPTIONS.copy()
+
+    options["default_search"] = "scsearch"
+
+    with yt_dlp.YoutubeDL(options) as ydl:
 
         info = ydl.extract_info(
-            f"ytsearch:{query}",
+            f"scsearch1:{query}",
             download=False
         )
 
-        if not info or not info.get("entries"):
+        if not info:
             return None
 
-        video = info["entries"][0]
+        entries = info.get("entries")
+
+        if not entries:
+            return None
+
+        song = entries[0]
 
         return {
-            "url": video["url"],
-            "title": video.get("title", "أغنية"),
-            "duration": video.get("duration", 0)
+            "url": song.get("url"),
+            "title": song.get(
+                "title",
+                "أغنية غير معروفة"
+            ),
+            "duration": song.get(
+                "duration",
+                0
+            ),
+            "webpage_url": song.get(
+                "webpage_url"
+            )
         }
 
 
-# =========================
+# ==========================================
 # تشغيل الأغنية التالية
-# =========================
+# ==========================================
 
 async def play_next(guild):
 
@@ -187,19 +239,36 @@ async def play_next(guild):
 
     voice_client = guild.voice_client
 
-    if not voice_client or not voice_client.is_connected():
+    if not voice_client:
         return
 
+    if not voice_client.is_connected():
+        return
+
+    # التأكد من الروم الصحيح
     if voice_client.channel.id != VOICE_CHANNEL_ID:
+
+        channel = bot.get_channel(
+            VOICE_CHANNEL_ID
+        )
+
         try:
-            channel = bot.get_channel(VOICE_CHANNEL_ID)
+
             await voice_client.move_to(channel)
-        except Exception:
+
+        except Exception as e:
+
+            print(
+                f"تعذر نقل البوت: {e}"
+            )
+
             return
 
+    # لا توجد أغاني
     if not player.queue:
 
         player.current_song = None
+
         return
 
     song = player.queue.pop(0)
@@ -208,15 +277,36 @@ async def play_next(guild):
 
     try:
 
+        # الحصول على رابط الصوت الحقيقي
+        def get_audio():
+
+            options = YDL_OPTIONS.copy()
+
+            with yt_dlp.YoutubeDL(options) as ydl:
+
+                info = ydl.extract_info(
+                    song["webpage_url"],
+                    download=False
+                )
+
+                return info["url"]
+
+        audio_url = await asyncio.to_thread(
+            get_audio
+        )
+
         audio_source = discord.FFmpegPCMAudio(
-            song["url"],
+            audio_url,
             **FFMPEG_OPTIONS
         )
 
         def after_playing(error):
 
             if error:
-                print(f"خطأ في التشغيل: {error}")
+
+                print(
+                    f"خطأ في التشغيل: {error}"
+                )
 
             asyncio.run_coroutine_threadsafe(
                 play_next(guild),
@@ -228,227 +318,342 @@ async def play_next(guild):
             after=after_playing
         )
 
-        print(f"يتم تشغيل: {song['title']}")
+        print(
+            f"تشغيل: {song['title']}"
+        )
 
     except Exception as e:
 
-        print(f"خطأ في تشغيل الأغنية: {e}")
+        print(
+            f"خطأ في تشغيل الأغنية: {e}"
+        )
 
         player.current_song = None
 
         await play_next(guild)
 
 
-# =========================
-# ش - تشغيل
-# =========================
+# ==========================================
+# ش = تشغيل
+# ==========================================
 
 @bot.command(name="ش")
-async def play_command(ctx, *, search=None):
+async def play_command(
+    ctx,
+    *,
+    search=None
+):
 
     if not search:
-        await ctx.send("اكتب اسم الأغنية بعد ش")
+
+        await ctx.send(
+            "اكتب اسم الأغنية بعد ش"
+        )
+
         return
 
     guild = ctx.guild
 
+    channel = bot.get_channel(
+        VOICE_CHANNEL_ID
+    )
+
+    if channel is None:
+
+        await ctx.send(
+            "ما قدرت ألقى الروم الصوتي المحدد"
+        )
+
+        return
+
     voice_client = guild.voice_client
 
-    # التأكد من الروم الثابت
-    if not voice_client or not voice_client.is_connected():
-
-        channel = bot.get_channel(VOICE_CHANNEL_ID)
+    # إذا غير متصل
+    if (
+        voice_client is None
+        or not voice_client.is_connected()
+    ):
 
         try:
+
             voice_client = await channel.connect(
                 reconnect=True,
                 timeout=30
             )
 
-        except Exception:
-            await ctx.send("تعذر الاتصال بالروم الصوتي")
+        except Exception as e:
+
+            print(e)
+
+            await ctx.send(
+                "تعذر الاتصال بالروم الصوتي"
+            )
+
             return
 
+    # إذا كان في روم آخر
     elif voice_client.channel.id != VOICE_CHANNEL_ID:
 
-        channel = bot.get_channel(VOICE_CHANNEL_ID)
-
         try:
-            await voice_client.move_to(channel)
 
-        except Exception:
-            await ctx.send("تعذر الانتقال للروم المحدد")
+            await voice_client.move_to(
+                channel
+            )
+
+        except Exception as e:
+
+            print(e)
+
+            await ctx.send(
+                "تعذر الانتقال للروم المحدد"
+            )
+
             return
 
-    await ctx.send(f"جاري البحث عن: {search}")
+    await ctx.send(
+        f"جاري البحث في SoundCloud عن: {search}"
+    )
 
     try:
 
         song = await asyncio.to_thread(
-            search_song,
+            search_soundcloud,
             search
         )
 
         if not song:
-            await ctx.send("ما لقيت الأغنية")
+
+            await ctx.send(
+                "ما لقيت الأغنية في SoundCloud"
+            )
+
             return
 
-        player = get_player(guild.id)
+        if not song["url"]:
+
+            await ctx.send(
+                "لقيت الأغنية لكن تعذر الحصول على رابط الصوت"
+            )
+
+            return
+
+        player = get_player(
+            guild.id
+        )
 
         player.queue.append(song)
 
         duration = song["duration"]
 
-        duration_text = str(
-            timedelta(seconds=duration)
-        )
+        if duration:
+
+            duration_text = str(
+                timedelta(
+                    seconds=int(duration)
+                )
+            )
+
+        else:
+
+            duration_text = "غير معروف"
 
         await ctx.send(
-            f"تمت إضافة: {song['title']}\n"
+            f"تمت الإضافة: {song['title']}\n"
             f"المدة: {duration_text}"
         )
 
-        if not voice_client.is_playing() and not voice_client.is_paused():
+        if (
+            not voice_client.is_playing()
+            and not voice_client.is_paused()
+        ):
 
             await play_next(guild)
 
     except Exception as e:
 
-        print(e)
+        print(
+            f"SoundCloud error: {e}"
+        )
 
         await ctx.send(
             f"حدث خطأ: {str(e)}"
         )
 
 
-# =========================
-# س - تخطي
-# =========================
+# ==========================================
+# س = تخطي
+# ==========================================
 
 @bot.command(name="س")
 async def skip_command(ctx):
 
     voice_client = ctx.guild.voice_client
 
-    if voice_client and voice_client.is_playing():
+    if (
+        voice_client
+        and voice_client.is_playing()
+    ):
 
         voice_client.stop()
 
-        await ctx.send("تم التخطي")
+        await ctx.send(
+            "تم التخطي"
+        )
 
     else:
 
-        await ctx.send("ما فيه أغنية شغالة")
+        await ctx.send(
+            "ما فيه أغنية شغالة"
+        )
 
 
-# =========================
-# و - وقف
-# =========================
+# ==========================================
+# و = إيقاف
+# ==========================================
 
 @bot.command(name="و")
 async def stop_command(ctx):
 
     voice_client = ctx.guild.voice_client
-    player = get_player(ctx.guild.id)
+
+    player = get_player(
+        ctx.guild.id
+    )
 
     player.queue.clear()
     player.current_song = None
 
-    if voice_client and (
-        voice_client.is_playing()
-        or voice_client.is_paused()
+    if (
+        voice_client
+        and (
+            voice_client.is_playing()
+            or voice_client.is_paused()
+        )
     ):
 
         voice_client.stop()
 
-    await ctx.send("تم إيقاف التشغيل")
+    await ctx.send(
+        "تم إيقاف التشغيل"
+    )
 
 
-# =========================
-# ب - إيقاف مؤقت
-# =========================
+# ==========================================
+# ب = إيقاف مؤقت
+# ==========================================
 
 @bot.command(name="ب")
 async def pause_command(ctx):
 
     voice_client = ctx.guild.voice_client
 
-    if voice_client and voice_client.is_playing():
+    if (
+        voice_client
+        and voice_client.is_playing()
+    ):
 
         voice_client.pause()
 
-        await ctx.send("تم الإيقاف المؤقت")
+        await ctx.send(
+            "تم الإيقاف المؤقت"
+        )
 
     else:
 
-        await ctx.send("ما فيه أغنية شغالة")
+        await ctx.send(
+            "ما فيه أغنية شغالة"
+        )
 
 
-# =========================
-# ت - استئناف
-# =========================
+# ==========================================
+# ت = استئناف
+# ==========================================
 
 @bot.command(name="ت")
 async def resume_command(ctx):
 
     voice_client = ctx.guild.voice_client
 
-    if voice_client and voice_client.is_paused():
+    if (
+        voice_client
+        and voice_client.is_paused()
+    ):
 
         voice_client.resume()
 
-        await ctx.send("تم استئناف التشغيل")
+        await ctx.send(
+            "تم استئناف التشغيل"
+        )
 
     else:
 
-        await ctx.send("ما فيه أغنية موقوفة")
+        await ctx.send(
+            "ما فيه أغنية موقوفة"
+        )
 
 
-# =========================
-# ع - قائمة الانتظار
-# =========================
+# ==========================================
+# ع = قائمة التشغيل
+# ==========================================
 
 @bot.command(name="ع")
 async def queue_command(ctx):
 
-    player = get_player(ctx.guild.id)
+    player = get_player(
+        ctx.guild.id
+    )
+
+    text = ""
+
+    if player.current_song:
+
+        text += (
+            f"تشغيل الآن: "
+            f"{player.current_song['title']}\n\n"
+        )
 
     if not player.queue:
 
-        if player.current_song:
+        if not text:
 
             await ctx.send(
-                f"تشغيل الآن: {player.current_song['title']}\n"
-                "ما فيه أغاني بعدها"
+                "قائمة التشغيل فارغة"
             )
 
         else:
 
-            await ctx.send("قائمة التشغيل فارغة")
+            await ctx.send(
+                text + "ما فيه أغاني بعدها"
+            )
 
         return
 
-    text = "قائمة التشغيل:\n"
+    text += "قائمة التشغيل:\n"
 
     for index, song in enumerate(
         player.queue[:10],
         1
     ):
 
-        text += f"{index}. {song['title']}\n"
+        text += (
+            f"{index}. "
+            f"{song['title']}\n"
+        )
 
     if len(player.queue) > 10:
 
         text += (
-            f"... و {len(player.queue) - 10} أغاني أخرى"
+            f"... و "
+            f"{len(player.queue) - 10} "
+            f"أغاني أخرى"
         )
 
     await ctx.send(text)
 
 
-# =========================
-# م - المساعدة
-# =========================
+# ==========================================
+# م = المساعدة
+# ==========================================
 
 @bot.command(name="م")
 async def help_command(ctx):
@@ -457,26 +662,31 @@ async def help_command(ctx):
         "أوامر البوت:\n\n"
         "ش [اسم الأغنية] - تشغيل\n"
         "س - تخطي\n"
-        "و - وقف\n"
+        "و - إيقاف\n"
         "ب - إيقاف مؤقت\n"
         "ت - استئناف\n"
         "ع - قائمة التشغيل\n"
         "م - المساعدة\n\n"
-        "البوت ثابت في الروم المحدد."
+        "المصدر: SoundCloud\n"
+        "البوت ثابت في الروم المحدد"
     )
 
 
-# =========================
-# معالجة الرسائل
-# =========================
+# ==========================================
+# تجاهل الأوامر غير المعروفة
+# ==========================================
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(
+    ctx,
+    error
+):
 
     if isinstance(
         error,
         commands.CommandNotFound
     ):
+
         return
 
     if isinstance(
@@ -495,16 +705,18 @@ async def on_command_error(ctx, error):
     )
 
 
-# =========================
+# ==========================================
 # تشغيل البوت
-# =========================
+# ==========================================
 
-token = os.getenv("DISCORD_TOKEN")
+token = os.getenv(
+    "DISCORD_TOKEN"
+)
 
 if not token:
 
     raise RuntimeError(
-        "DISCORD_TOKEN غير موجود في متغيرات Railway"
+        "DISCORD_TOKEN غير موجود في Railway Variables"
     )
 
 bot.run(token)
