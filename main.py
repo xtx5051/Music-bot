@@ -211,4 +211,4 @@ async def help_command(ctx):
     await ctx.send(embed=embed)
 
 # تشغيل البوت
-bot.run(MTUyODk1MTkyMDk3MzE4OTE3Mw.GfcmPp.K1EX-JXrmAtJwCTODGB6WF0ZX06nr_HkfUF4ck)
+bot.run("MTUyODk1MTkyMDk3MzE4OTE3Mw.GMv9Zj.K9POj9wMZAQVnh49hXcJ2YSH1TlABq6bY4Dz0s")
