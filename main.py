@@ -49,7 +49,7 @@ async def on_ready():
 
 @bot.event
 async def on_voice_state_update(member, before, after):
-    """إبقاء البوت في الغرفة الصوتية - لا يطلع حتى لو غادر الجميع"""
+    """إذا غادر الجميع الروم، يطلع البوت أيضاً"""
     if member.id == bot.user.id:
         return
     
@@ -58,12 +58,19 @@ async def on_voice_state_update(member, before, after):
     if not voice_client:
         return
     
-    # البوت يبقى في الروم ولا يطلع حتى لو كان وحيداً
-    # لإزالة هذه الميزة، استخدم الأمر !leave
+    # التحقق من عدد الأعضاء المتبقيين في الروم (بدون عد البوت)
+    members_in_channel = [m for m in voice_client.channel.members if not m.bot]
+    
+    # إذا لم يبقى أحد، البوت يطلع
+    if len(members_in_channel) == 0:
+        await voice_client.disconnect()
+        if member.guild.id in playlists:
+            playlists[member.guild.id].queue = []
+            playlists[member.guild.id].current_song = None
 
 @bot.command(name='join')
 async def join(ctx):
-    """الأمر: د - دخول الغرفة الصوتية"""
+    """الأمر: !join - دخول الغرفة الصوتية"""
     if not ctx.author.voice:
         await ctx.send("❌ خش الروم اول يا ثور")
         return
@@ -97,7 +104,7 @@ async def leave(ctx):
 
 @bot.command(name='play')
 async def play(ctx, *, search):
-    """الأمر: ش [وش اسم الاغنيه ؟]"""
+    """الأمر: !play [اسم الأغنية]"""
     if not ctx.voice_client:
         await ctx.send("❌ البوت غير متصل! استخدم !join أولاً")
         return
@@ -211,7 +218,13 @@ async def skip(ctx):
     else:
         await ctx.send("❌ لا توجد أغنية قيد التشغيل!")
 
-# أوامر الأحرف المختصرة
+# ==================== أوامر بدون علامة تعجب ====================
+
+@bot.command(name='د')
+async def join_shortcut(ctx):
+    """اختصار: د - دخول الروم"""
+    await join(ctx)
+
 @bot.command(name='ش')
 async def play_shortcut(ctx, *, search):
     """اختصار: ش [اسم الأغنية] - تشغيل أغنية"""
@@ -227,24 +240,45 @@ async def skip_shortcut(ctx):
     """اختصار: س - تخطي الأغنية"""
     await skip(ctx)
 
-@bot.command(name='myhelp')
+@bot.command(name='ع')
+async def queue_shortcut(ctx):
+    """اختصار: ع - عرض قائمة التشغيل"""
+    await queue(ctx)
+
+@bot.command(name='ب')
+async def pause_shortcut(ctx):
+    """اختصار: ب - إيقاف مؤقت"""
+    await pause(ctx)
+
+@bot.command(name='ت')
+async def resume_shortcut(ctx):
+    """اختصار: ت - استئناف التشغيل"""
+    await resume(ctx)
+
+@bot.command(name='خ')
+async def leave_shortcut(ctx):
+    """اختصار: خ - طلع من الروم"""
+    await leave(ctx)
+
+# ==================== أوامر المساعدة ====================
+
+@bot.command(name='help')
+@bot.command(name='h')
+@bot.command(name='م')
 async def help_command(ctx):
-    """الأمر: !help - عرض قائمة الأوامر"""
+    """الأمر: !help أو !h أو !م - عرض قائمة الأوامر"""
     embed = discord.Embed(title="🎵 أوامر بوت الموسيقى", color=discord.Color.gold())
     
     commands_info = [
-        ("!join", "دخول الغرفة الصوتية"),
-        ("!leave", "مغادرة الغرفة الصوتية"),
-        ("!play [اسم/رابط]", "تشغيل أغنية"),
-        ("!ش [اسم/رابط]", "⭐ تشغيل أغنية (اختصار)"),
-        ("!pause", "إيقاف مؤقت"),
-        ("!resume", "استئناف التشغيل"),
-        ("!stop", "إيقاف التشغيل"),
-        ("!و", "⭐ إيقاف التشغيل (اختصار)"),
-        ("!skip", "تخطي الأغنية"),
-        ("!س", "⭐ تخطي الأغنية (اختصار)"),
-        ("!queue", "عرض قائمة التشغيل"),
-        ("!help", "عرض هذه الرسالة"),
+        ("!join أو !د", "دخول الغرفة الصوتية"),
+        ("!leave أو !خ", "مغادرة الغرفة الصوتية"),
+        ("!play [اسم/رابط] أو !ش", "تشغيل أغنية"),
+        ("!pause أو !ب", "إيقاف مؤقت"),
+        ("!resume أو !ت", "استئناف التشغيل"),
+        ("!stop أو !و", "إيقاف التشغيل"),
+        ("!skip أو !س", "تخطي الأغنية"),
+        ("!queue أو !ع", "عرض قائمة التشغيل"),
+        ("!help أو !h أو !م", "عرض هذه الرسالة"),
     ]
     
     for cmd, desc in commands_info:
