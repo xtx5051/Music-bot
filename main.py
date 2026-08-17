@@ -92,10 +92,13 @@ async def on_ready():
 
         print(f"تم الدخول للروم: {channel.name}")
 
+    except discord.Forbidden:
+        print(f"❌ البوت ما عنده صلاحية الدخول للروم الصوتي")
+    except discord.ClientException as e:
+        print(f"❌ خطأ الاتصال: {e}")
     except Exception as e:
-    print(f"VOICE ERROR: {type(e).__name__}: {e}")
-    await ctx.send(f"خطأ الاتصال بالروم: {type(e).__name__}: {e}")
-    return
+        print(f"❌ خطأ غير متوقع: {type(e).__name__}: {e}")
+
 
 # =========================
 # إعادة الاتصال بالروم
@@ -117,19 +120,28 @@ async def keep_connected():
                 if voice_client is None or not voice_client.is_connected():
                     try:
                         voice_client = await channel.connect()
+                        player = playlists.get(channel.guild.id)
+                        if player:
+                            player.voice_client = voice_client
+                        print(f"✅ تم إعادة الاتصال بـ {channel.name}")
+                    except discord.Forbidden:
+                        print("❌ البوت ما عنده صلاحية")
                     except discord.ClientException:
-                        pass
+                        print("⚠️ البوت موجود في روم آخر")
 
                 elif voice_client.channel.id != VOICE_CHANNEL_ID:
-                    await voice_client.move_to(channel)
-
-                player = playlists.get(channel.guild.id)
-
-                if player:
-                    player.voice_client = voice_client
+                    try:
+                        await voice_client.move_to(channel)
+                    except Exception as e:
+                        print(f"⚠️ خطأ النقل: {e}")
+                else:
+                    # تحديث الـ player حتى لو كان متصل
+                    player = playlists.get(channel.guild.id)
+                    if player:
+                        player.voice_client = voice_client
 
         except Exception as e:
-            print(f"خطأ في الاتصال: {e}")
+            print(f"⚠️ خطأ في keep_connected: {e}")
 
         await asyncio.sleep(15)
 
@@ -204,7 +216,7 @@ async def play_next(guild_id, channel):
         def after_playing(error):
 
             if error:
-                print(f"خطأ في التشغيل: {error}")
+                print(f"❌ خطأ في التشغيل: {error}")
 
             asyncio.run_coroutine_threadsafe(
                 play_next(guild_id, channel),
@@ -217,12 +229,12 @@ async def play_next(guild_id, channel):
         )
 
         await channel.send(
-            f"الآن يتم التشغيل: {song['title']}"
+            f"🎵 الآن يتم التشغيل: {song['title']}"
         )
 
     except Exception as e:
 
-        print(f"خطأ في تشغيل الأغنية: {e}")
+        print(f"❌ خطأ في تشغيل الأغنية: {e}")
 
         player.current_song = None
 
@@ -238,13 +250,14 @@ async def play_next(guild_id, channel):
 async def play_command(ctx, *, search=None):
 
     if not search:
-        await ctx.send("اكتب اسم الأغنية بعد ش")
+        await ctx.send("⚠️ اكتب اسم الأغنية بعد ش")
         return
 
     channel = bot.get_channel(VOICE_CHANNEL_ID)
 
     if channel is None:
-        await ctx.send("لم يتم العثور على الروم الصوتي")
+        await ctx.send("❌ لم يتم العثور على الروم الصوتي")
+        print("❌ VOICE_CHANNEL_ID غير صحيح أو الروم محذوف")
         return
 
     player = playlists.get(ctx.guild.id)
@@ -256,17 +269,27 @@ async def play_command(ctx, *, search=None):
     voice_client = player.voice_client
 
     if voice_client is None or not voice_client.is_connected():
-
         try:
             voice_client = await channel.connect()
             player.voice_client = voice_client
+            print(f"✅ تم الاتصال بـ {channel.name}")
 
-        except Exception as e:
-            await ctx.send("تعذر الاتصال بالروم الصوتي")
-            print(e)
+        except discord.Forbidden:
+            await ctx.send("❌ البوت ما عنده صلاحي�� الدخول للروم الصوتي\nتأكد من الصلاحيات في إعدادات السيرفر")
+            print("❌ Forbidden: البوت ما عنده صلاحية")
             return
 
-    await ctx.send(f"جاري البحث عن: {search}")
+        except discord.ClientException as e:
+            await ctx.send("❌ البوت موجود في روم آخر أو خطأ في الاتصال")
+            print(f"❌ ClientException: {e}")
+            return
+
+        except Exception as e:
+            await ctx.send(f"❌ خطأ الاتصال: {type(e).__name__}")
+            print(f"❌ Unexpected error: {type(e).__name__}: {e}")
+            return
+
+    await ctx.send(f"🔍 جاري البحث عن: {search}")
 
     try:
 
@@ -276,7 +299,7 @@ async def play_command(ctx, *, search=None):
         )
 
         if song is None:
-            await ctx.send("لم يتم العثور على الأغنية")
+            await ctx.send("❌ لم يتم العثور على الأغنية")
             return
 
         player.queue.append(song)
@@ -285,23 +308,20 @@ async def play_command(ctx, *, search=None):
         duration_str = str(timedelta(seconds=int(duration)))
 
         await ctx.send(
-            f"تمت إضافة: {song['title']}\n"
-            f"المدة: {duration_str}\n"
-            f"في الانتظار: {len(player.queue)}"
+            f"✅ تمت إضافة: {song['title']}\n"
+            f"⏱️ المدة: {duration_str}\n"
+            f"⏳ في الانتظار: {len(player.queue)}"
         )
 
         if not voice_client.is_playing() and not voice_client.is_paused():
-
             await play_next(
                 ctx.guild.id,
                 ctx.channel
             )
 
     except Exception as e:
-
-        await ctx.send(
-            f"حدث خطأ: {str(e)}"
-        )
+        await ctx.send(f"❌ حدث خطأ: {type(e).__name__}")
+        print(f"❌ Search error: {type(e).__name__}: {e}")
 
 
 # =========================
@@ -314,19 +334,16 @@ async def skip_command(ctx):
     player = playlists.get(ctx.guild.id)
 
     if not player or not player.voice_client:
-        await ctx.send("ما فيه أغنية شغالة")
+        await ctx.send("⚠️ ما فيه أغنية شغالة")
         return
 
     voice_client = player.voice_client
 
     if voice_client.is_playing() or voice_client.is_paused():
-
         voice_client.stop()
-
-        await ctx.send("تم التخطي")
-
+        await ctx.send("✅ تم التخطي")
     else:
-        await ctx.send("ما فيه أغنية شغالة")
+        await ctx.send("⚠️ ما فيه أغنية شغالة")
 
 
 # =========================
@@ -339,22 +356,18 @@ async def stop_command(ctx):
     player = playlists.get(ctx.guild.id)
 
     if not player or not player.voice_client:
-        await ctx.send("ما فيه أغنية شغالة")
+        await ctx.send("⚠️ ما فيه أغنية شغالة")
         return
 
     voice_client = player.voice_client
 
     if voice_client.is_playing() or voice_client.is_paused():
-
         voice_client.stop()
-
         player.queue.clear()
         player.current_song = None
-
-        await ctx.send("تم إيقاف التشغيل وحذف قائمة الانتظار")
-
+        await ctx.send("✅ تم إيقاف التشغيل وحذف قائمة الانتظار")
     else:
-        await ctx.send("ما فيه أغنية شغالة")
+        await ctx.send("⚠️ ما فيه أغنية شغالة")
 
 
 # =========================
@@ -367,15 +380,12 @@ async def pause_command(ctx):
     player = playlists.get(ctx.guild.id)
 
     if player and player.voice_client:
-
         if player.voice_client.is_playing():
-
             player.voice_client.pause()
-
-            await ctx.send("تم الإيقاف المؤقت")
+            await ctx.send("✅ تم الإيقاف المؤقت")
             return
 
-    await ctx.send("ما فيه أغنية شغالة")
+    await ctx.send("⚠️ ما فيه أغنية شغالة")
 
 
 # =========================
@@ -388,15 +398,12 @@ async def resume_command(ctx):
     player = playlists.get(ctx.guild.id)
 
     if player and player.voice_client:
-
         if player.voice_client.is_paused():
-
             player.voice_client.resume()
-
-            await ctx.send("تم استئناف التشغيل")
+            await ctx.send("✅ تم استئناف التشغيل")
             return
 
-    await ctx.send("ما فيه أغنية موقوفة")
+    await ctx.send("⚠️ ما فيه أغنية موقوفة")
 
 
 # =========================
@@ -409,14 +416,14 @@ async def queue_command(ctx):
     player = playlists.get(ctx.guild.id)
 
     if not player:
-        await ctx.send("قائمة الانتظار فارغة")
+        await ctx.send("📭 قائمة الانتظار فارغة")
         return
 
     if not player.queue:
-        await ctx.send("قائمة الانتظار فارغة")
+        await ctx.send("📭 قائمة الانتظار فارغة")
         return
 
-    message = "قائمة الانتظار:\n\n"
+    message = "📋 قائمة الانتظار:\n\n"
 
     for i, song in enumerate(player.queue[:10], 1):
         message += f"{i}. {song['title']}\n"
@@ -435,27 +442,27 @@ async def queue_command(ctx):
 async def help_command(ctx):
 
     message = """
-أوامر البوت:
+📖 **أوامر البوت:**
 
-ش اسم الأغنية
-تشغيل أغنية
+**ش** اسم الأغنية
+→ تشغيل أغنية
 
-س
-تخطي الأغنية
+**س**
+→ تخطي الأغنية
 
-و
-إيقاف التشغيل وحذف الانتظار
+**و**
+→ إيقاف التشغيل وحذف الانتظار
 
-ب
-إيقاف مؤقت
+**ب**
+→ إيقاف مؤقت
 
-ت
-استئناف التشغيل
+**ت**
+→ استئناف التشغيل
 
-ع
-عرض قائمة الانتظار
+**ع**
+→ عرض قائمة الانتظار
 
-البوت يدخل الروم المحدد تلقائيًا ولا يخرج منه.
+**ℹ️** البوت يدخل الروم المحدد تلقائيًا ولا يخرج منه.
 """
 
     await ctx.send(message)
@@ -471,7 +478,7 @@ async def main():
 
     if not token:
         raise RuntimeError(
-            "لم يتم العثور على DISCORD_TOKEN في Environment Variables"
+            "❌ لم يتم العثور على DISCORD_TOKEN في Environment Variables"
         )
 
     asyncio.create_task(keep_connected())
