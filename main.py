@@ -45,31 +45,53 @@ class MusicPlayer:
 @bot.event
 async def on_ready():
     print(f'✅ البوت شغال! {bot.user}')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name=""))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="🎵 الموسيقى"))
+
+@bot.event
+async def on_voice_state_update(member, before, after):
+    """إبقاء البوت في الغرفة الصوتية - لا يطلع حتى لو غادر الجميع"""
+    if member.id == bot.user.id:
+        return
+    
+    voice_client = discord.utils.get(bot.voice_clients, guild=member.guild)
+    
+    if not voice_client:
+        return
+    
+    # البوت يبقى في الروم ولا يطلع حتى لو كان وحيداً
+    # لإزالة هذه الميزة، استخدم الأمر !leave
 
 @bot.command(name='join')
 async def join(ctx):
     """الأمر: د - دخول الغرفة الصوتية"""
     if not ctx.author.voice:
-        await ctx.send(" خش الروم اول يا ثور")
+        await ctx.send("❌ خش الروم اول يا ثور")
         return
     
     channel = ctx.author.voice.channel
+    
+    # إذا كان البوت متصل بغرفة أخرى، اطلعه أولاً
+    if ctx.voice_client:
+        await ctx.voice_client.disconnect()
+    
     voice_client = await channel.connect()
     
-    # تهيئة قائمة التشغيل
+    # تهيئة ��ائمة التشغيل
     if ctx.guild.id not in playlists:
         playlists[ctx.guild.id] = MusicPlayer(ctx.guild.id)
     
     playlists[ctx.guild.id].voice_client = voice_client
-    await ctx.send(f"خشيت: **{channel.name}**")
+    await ctx.send(f"✅ خشيت: **{channel.name}**")
 
 @bot.command(name='leave')
 async def leave(ctx):
     """الأمر: !leave - مغادرة الغرفة الصوتية"""
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        await ctx.send("طلعت")
+        if ctx.guild.id in playlists:
+            playlists[ctx.guild.id].queue = []
+            playlists[ctx.guild.id].current_song = None
+        await ctx.send("👋 طلعت من الروم!")
     else:
         await ctx.send("❌ البوت غير متصل بأي غرفة صوتية!")
 
@@ -80,7 +102,7 @@ async def play(ctx, *, search):
         await ctx.send("❌ البوت غير متصل! استخدم !join أولاً")
         return
     
-    await ctx.send(f"ثواني ابحث: **{search}**...")
+    await ctx.send(f"🔍 ثواني ابحث: **{search}**...")
     
     try:
         with yt_dlp.YoutubeDL(ydl_options) as ydl:
@@ -131,7 +153,7 @@ async def play_next(ctx):
 
 @bot.command(name='pause')
 async def pause(ctx):
-    """الأمر: !pause -و"""
+    """الأمر: !pause - إيقاف مؤقت"""
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.pause()
         await ctx.send("⏸️ تم الإيقاف المؤقت")
@@ -140,7 +162,7 @@ async def pause(ctx):
 
 @bot.command(name='resume')
 async def resume(ctx):
-    """الأمر: !resume -ا"""
+    """الأمر: !resume - استئناف التشغيل"""
     if ctx.voice_client and ctx.voice_client.is_paused():
         ctx.voice_client.resume()
         await ctx.send("▶️ تم استئناف التشغيل")
@@ -149,7 +171,7 @@ async def resume(ctx):
 
 @bot.command(name='stop')
 async def stop(ctx):
-    """الأمر: !stop -و"""
+    """الأمر: !stop - إيقاف التشغيل"""
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
         playlists[ctx.guild.id].queue = []
@@ -170,7 +192,7 @@ async def queue(ctx):
     embed = discord.Embed(title="📋 قائمة التشغيل", color=discord.Color.purple())
     
     if player.current_song:
-        embed.add_field(name="بشغل", value=player.current_song['title'], inline=False)
+        embed.add_field(name="▶️ بشغل حالياً", value=player.current_song['title'], inline=False)
     
     for i, song in enumerate(player.queue[:10], 1):
         embed.add_field(name=f"{i}. الأغنية التالية", value=song['title'], inline=False)
@@ -182,10 +204,10 @@ async def queue(ctx):
 
 @bot.command(name='skip')
 async def skip(ctx):
-    """الأمر: !skip -س"""
+    """الأمر: !skip - تخطي الأغنية الحالية"""
     if ctx.voice_client and ctx.voice_client.is_playing():
         ctx.voice_client.stop()
-        await ctx.send("سكبت")
+        await ctx.send("⏭️ سكبت للأغنية التالية")
     else:
         await ctx.send("❌ لا توجد أغنية قيد التشغيل!")
 
