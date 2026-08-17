@@ -212,4 +212,4 @@ async def help_command(ctx):
     await ctx.send(embed=embed)
 
 # تشغيل البوت
-bot.run(os.getenv("MTUyODk1MTkyMDk3MzE4OTE3Mw.GfiJg6.YCaiIIoQdMNWbLLO7oxcMOdGoj-_W-8wZF6jd0"))
+bot.run(os.getenv("DISCORD_TOKEN"))
